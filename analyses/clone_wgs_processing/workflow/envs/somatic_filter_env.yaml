@@ -1,0 +1,14 @@
+name: somatic_filter
+channels:
+  - conda-forge
+  - r
+  - bioconda
+dependencies:
+  - bcftools
+  - r-optparse
+  - r-tidyverse
+  - r-stringr
+  - r-vcfr
+  - r-MASS
+  - r-pbmcapply
+  - r-vgam

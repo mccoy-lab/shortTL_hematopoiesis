@@ -1,1 +1,3 @@
 analyses/drift_only_vaf/plots/*
+analysis/clone_wgs_processing/config/config.yaml
+analysis/clone_wgs_processing/logs/*
