@@ -1,0 +1,126 @@
+---
+title: "Modeling convergence in HSC population"
+author: "Michael Tassia"
+date: "2025-09-22"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### Load libraries
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+library(tidyverse)
+library(pbapply)
+library(patchwork)
+library(cowplot)
+library(viridis)
+```
+
+### Set parameters
+
+Parameter values obtained from empirical estimates in [Mitchell et al. 2022](https://doi.org/10.3389/fragi.2022.1018119). Human genome size is a rough approximation.
+
+```{r}
+hsc_pop <- c(80000,100000,120000) 
+ages <- seq(1,80,1)
+annual_rates <- 2^seq(4,13) 
+diploid_genome_size <- 6.4e9
+```
+
+### Run models
+
+Code block will compute $P(X > 1)$ using Poisson and Binomial distributions (both results are identical). Note that these model the probability of a mutation occurring at the same site in any $>1$ genomes in the population, disregarding the resulting state of the mutation.
+
+```{r}
+## Poisson model
+p.df <- pblapply(hsc_pop, function(x) {
+  lapply(annual_rates, function(y) {
+    df <- ppois(q = 1,
+                lambda = ((y / diploid_genome_size) * x * ages), 
+                lower.tail = F) %>% 
+      as.data.frame() %>%
+      rownames_to_column(var="age") %>%
+      mutate(age = as.numeric(age)) %>%
+      rename("p" = ".") # set the prob column name to p and convert rowname to age column
+    
+    df$N <- x # set HSC population size for df
+    df$annual_muts <- as.factor(y) # set annual mutation rate for df
+    df <- df %>% select(age, N, annual_muts, p)
+    return(df)
+  })
+}) %>% 
+  bind_rows() %>% 
+  tibble()
+
+## Binomial model
+b.df <- pblapply(hsc_pop, function(x) {
+  lapply(annual_rates, function(y) {
+    df <- pbinom(q = 1,
+                 prob = ((y / diploid_genome_size) * ages),
+                 size = x,
+                 lower.tail = F) %>% 
+      as.data.frame() %>%
+      rownames_to_column(var = "age") %>%
+      mutate(age = as.numeric(age)) %>%
+      rename("p" = ".")
+    
+    df$N <- x
+    df$annual_muts <- as.factor(y)
+    df<-df %>% select(age, N, annual_muts, p)
+    return(df)
+  })
+}) %>% 
+  bind_rows() %>% 
+  tibble()
+```
+
+### Plot results
+
+The plots below show curves as $P(X > 1)$ for the mean estimate for HSC population size, and ribbons show the range $\pm 20,000$ cells. Note that these are the conditional CDFs for the population and does not reflect sampling noise.
+
+```{r echo=FALSE, fig.dim=c(8.5, 4), message=FALSE, warning=FALSE}
+a <- p.df %>% 
+  mutate(N = factor(N,levels=c(80000,100000,120000))) %>%
+  pivot_wider(names_from = N,values_from = p) %>%
+  ggplot(aes(x=age,fill=annual_muts)) +
+  geom_hline(yintercept=seq(0,1,0.25),linetype=2,linewidth=0.5,color="gray90") +
+  geom_ribbon(aes(ymin=`80000`,ymax=`120000`),alpha = 0.5) +
+  geom_line(aes(y=`1e+05`,color=annual_muts)) +
+  scale_fill_viridis(discrete=T,option="A",end = 0.9,guide=guide_legend(reverse = T)) +
+  scale_color_viridis(discrete=T,option='A',end = 0.9,guide=guide_legend(reverse = T)) +
+  theme_cowplot() +
+  theme(legend.position = c(0.01,0.99),
+        legend.justification = c(0,1),
+        legend.background = element_rect(fill="white"),
+        legend.title = element_text(face="italic"),
+        axis.title = element_text(face="italic")) +
+  labs(x=expression(t~(years)),
+       y=expression(P(X>1)),
+       color=expression(mu~(mutations/cell/year)),
+       fill=expression(mu~(mutations/cell/year)),
+       title = "Poisson model")
+
+b <- b.df %>% 
+  mutate(N = factor(N,levels=c(80000,100000,120000))) %>%
+  pivot_wider(names_from = N,values_from = p) %>%
+  ggplot(aes(x=age,fill=annual_muts)) +
+  geom_hline(yintercept=seq(0,1,0.25),linetype=2,linewidth=0.5,color="gray90") +
+  geom_ribbon(aes(ymin=`80000`,ymax=`120000`),alpha = 0.5) +
+  geom_line(aes(y=`1e+05`,color=annual_muts)) +
+  scale_fill_viridis(discrete=T,option="A",end = 0.9,guide=guide_legend(reverse = T)) +
+  scale_color_viridis(discrete=T,option='A',end = 0.9,guide=guide_legend(reverse = T)) +
+  theme_cowplot() +
+  theme(legend.position = c(0.01,0.99),
+        legend.justification = c(0,1),
+        legend.background = element_rect(fill="white"),
+        legend.title = element_text(face="italic"),
+        axis.title = element_text(face="italic")) +
+  labs(x=expression(t~(years)),
+       y=expression(P(X>1)),
+       color=expression(mu~(mutations/cell/year)),
+       fill=expression(mu~(mutations/cell/year)),
+       title = "Binomial model")
+
+(a | b) + patchwork::plot_layout(guides = "collect", axes = "collect") & theme(legend.position = "bottom")
+```

@@ -1,3 +1,9 @@
 analyses/drift_only_vaf/plots/*
-analysis/clone_wgs_processing/config/config.yaml
-analysis/clone_wgs_processing/logs/*
+analyses/4_stochastic_character_mapping/.Rproj.user
+analyses/4_stochastic_character_mapping/.RData
+analyses/4_stochastic_character_mapping/.Rhistory
+analyses/4_stochastic_character_mapping/*.Rproj
+./dev/
+./data/
+.DS_Store
+.Rproj.user

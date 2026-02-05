@@ -41,3 +41,7 @@ This command will call the parent [`Snakefile`](workflow/Snakefile) which subseq
 The [`workflow/scripts/`](workflow/scripts) directory contains all scripts required for the [`map_clones.smk`](workflow/rules/map_clones.smk) rules. All scripts are included in `input` directives within [`map_clones.smk`](workflow/rules/map_clones.smk), so the pipeline will not initialize without first confirming they're present.
 
 Additionally, the [`workflow/scripts/companion_scripts/`](workflow/scripts/companion_scripts/) subdirectory contains additional functions used for phylogenetic inference preparation/execution.
+
+### Rulegraph
+
+![Rulegraph](rulegraph.png)
