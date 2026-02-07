@@ -1,0 +1,169 @@
+---
+title: "Application of stochastic character mapping to reconstruct the origin of somatic mutations"
+author: "Michael Tassia"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Introduction
+
+To infer the origin of somatic mutations using stochastic character mapping (SCM; algorithm description can be found in [Bollback 2006](https://pubmed.ncbi.nlm.nih.gov/16504105/)), we use the comparative phylogenetic toolkit `phytools` in R. Comparative phylogenetics has a long history within R, and the modular design of `phytools` (and its dependencies) make it simple to implement SCM for a single somatic single nucleotide variant (SNV).
+
+## Methods
+
+First, the following libraries are required for loading data and performing SCM. These libraries are included in the conda environment specified in [`scm_env.yaml`].
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+# Required packages
+library(phytools)
+library(tidyverse)
+library(data.table)
+library(vcfR)
+library(pbapply)
+library(snow)
+library(RColorBrewer)
+
+```
+
+Additionally, we will load custom functions for reading data and performing SCM from the `scm_functions.R` script.
+
+```{r, message=FALSE, warning=FALSE, include=TRUE}
+
+source("scm_functions.R")
+
+```
+
+### Load data
+
+There are three fundamental parameters to SCM:
+
+1.  A phylogenetic tree describing the relationship among all samples (cells), with branch lengths measured in substitutions per site.
+
+2.  Substitution matrix ($\textbf{Q}$) describing the rates of change between character states (e.g., unphased genotype states), jointly inferred with the phylogenetic tree (see [CellPhy manuscript](https://github.com/amkozlov/cellphy))
+
+3.  Genotype state priors for each sample (cell)
+
+We will load (and visualize) each of these components below.
+
+#### Phylogenetic tree
+
+The phylogeny needs to be rooted such that the root node best reflects the germline state; this allows for empirical priors for the root node if germline states are known and/or uncertain. Here, we use a matched normal (`OUTGROUP`) as the outgroup to define the root. The scale bar presented in the figure below has units of *substitutions per site*.
+
+```{r, warning=FALSE, fig.dim=c(8, 4)}
+
+# Read tree
+tree <- read.tree(file = "data/ST1.nwk",) %>%
+  root(outgroup = "OUTGROUP", resolve.root = TRUE) %>%
+  drop.tip("OUTGROUP")
+
+# Plot tree with scalebar (sub/site)
+plot.phylo(x = ladderize(tree),
+         direction = "downwards",
+         color = "black",
+         cex = 0.5,
+         fsize = 0.8,
+         lwd = 2)
+add.scale.bar(length = 0.01, 
+              lwd = 2, 
+              x = 0, 
+              y = max(nodeHeights(tree)), cex = 0.5)
+```
+
+#### Substitution model
+
+The substitution model file output by [CellPhy](https://github.com/amkozlov/cellphy) contains information on the relative rates of change between unphased diploid genotypes (A/A, A/C, A/G, A/T, C/C, C/G, C/T, G/G, G/T, T/T) and the relative frequencies for each genotype state. The formatting for this file (as output by `CellPhy` version `0.9.2`) is discussed in [this thread](https://groups.google.com/d/msgid/raxml/16f92bbc-20c6-4559-a42e-c949c35289d1n%40googlegroups.com). From these two matrices, we can generate the $Q_{10}$ substitution matrix for the 10 unphased diploid genotype states, which is required for SCM.
+
+```{r}
+
+# Read substitution model
+q <- read_cellphy_model("data/ST1.Q.txt")
+
+# View table
+round(q, 3)
+
+```
+
+In the $Q_{10}$ matrix above, rows ($q_i$) denote the starting state and columns ($q_j$) denote the end state. The value $q_{ij}$ is the state substitution probability per unit of branch length (i.e., per substitution per site). Diagonal entries are the probability of remaining in the same state, computed as $-1$ times the sum of the off-diagonal elements in the same row.
+
+```{r, fig.dim=c(4, 4)}
+# For visualization purposes, we will replace all "near-zero" values with zeroes
+# and remove all vectors with zero rates
+q.plot <- q
+q.plot[which(q.plot == 0.001)] <- 0
+plot.Qmatrix(x = q.plot,
+             show.zeros = FALSE,
+             text = FALSE,
+             signif = 2)
+```
+
+#### Genotype state priors
+
+Next we will load a multi-sample VCF of somatic variants, where all tips in `tree` are represented as samples in the VCF. From this VCF, we can compute scaled probabilities from the Phred-scaled genotype likelihoods (`PL` FORMAT field). Here, we are using a small subset of variants for demonstration purposes only (these are somatic variants with \> 1 origin on the tree).
+
+```{r message=FALSE, warning=FALSE}
+
+# Read VCF
+vcf <- read.vcfR("data/ST1.scm_vars.vcf.gz", verbose = FALSE)
+
+# Compile somatic SNV genotype priors
+gt_states <- compile_gt_states.snp(vcf)
+```
+
+The function `compile_gt_states.snp()` reads the `vcfR` object and outputs a list of of data.tables, where each data.table can be accessed either through list indexing (e.g., `gt_states[[1]]`). Alternatively, an index can be accessed by its `<chrom>_<pos>` string:
+
+```{r}
+
+# Print tibble
+tibble(gt_states[["chr9_125226000"]]) %>%
+  select(!c(locus)) %>%
+  mutate(AA = round(AA, 3),
+         TT = round(TT, 3),
+         AT = round(AT, 3))
+
+```
+
+### Perform SCM
+
+To perform SCM for a single somatic SNP, we will use the wrapper function `runSCM_single()`. In this example here, we will run SCM for 1000 replicates on the locus `chr9_125226000` using a naive root state prior.
+
+```{r}
+
+scm <- runSCM_single(locus_str = "chr9_125226000",
+              tree = tree,
+              gt_state_list = gt_states,
+              Qmat = q,
+              reps = 1000,
+              cores = 6)
+
+```
+
+Because we requested 1000 replicates and 6 cores, the wrapper rounded up to the nearest multiple of 6 (i.e., 1002 replicates) and distributed the SCM replicates across 6 parallel R processes. The wrapper runs $N$ instances of the `phytools` function `make.simmap()`, where $N$ is the number of requested cores.
+
+Below, we will summarize across the posterior distribution to infer the number of state changes on the tree:
+
+```{r}
+
+summary(scm)
+
+```
+Note that the summary statistics per genotype state are only relevant for the observed states (here: AA & TT).
+
+Finally, we can plot state transitions (as black diamonds) along edges where the genotype states shift from ancestor to descendent and both genotype calls have posterior probabilities $\ge$ 0.95.
+
+```{r, fig.dim=c(8.5, 4)}
+
+scm_summary <- summarise_scm.snp(scm,
+                                 plot = T,
+                                 legend = T,
+                                 PPthreshold = 0.95)
+
+```
+
+## Environment
+
+```{r}
+sessionInfo()
+```

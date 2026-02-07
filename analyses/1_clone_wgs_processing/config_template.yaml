@@ -1,0 +1,52 @@
+input:
+  individual: "individualA" # used for naming output
+  directory: "/path/to/fastq_directory" # directory containing paired-end sequence data (e.g., sample1_L001_R1.fastq.gz, sample2_L001_R2.fastq.gz, sample1_L002_R1.fastq.gz, sample1_L002_R2.fastq.gz)
+  libraries: ["sample1", "sample2", "sample3", "germ1", "germ2"] # List of all libraries to include from sequencing project; each element should be a string corresponding to the fastq file's name prior to lane + read declaration.
+  germline_libraries: ["germ1", "germ2"] # Libraries used for matched normal
+  pileup_window: "chr5:1295046-1296135" # Genomic window to generate pileup for visualizing reads
+  curated_somatic_sites: # Loci to bypass somatic filtering
+    - "chr5:1295046"  
+    - "chr5:1295113"
+output_dir: "/path/to/output" # directory for output
+references:
+  grch38: "/path/to/GRCh38.d1.vd1.fa" # GRCh38 human genome assembly
+  mills: "/path/to/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz" # Used for GATK VQSR
+  axiom: "/path/to/genotypes.all_populations.poly.hg38.vcf.gz" # Used for GATK VQSR
+  dbsnp: "/path/to/Homo_sapiens_assembly38.dbsnp138.vcf.gz" # Used for GATK VQSR
+  tgp: "/path/to/1000G_phase1.snps.high_confidence.hg38.vcf.gz" # Used for GATK VQSR
+  hapmap: "/path/to/hapmap_3.3.hg38.vcf.gz" # Used for GATK VQSR
+  omni: "/path/to/1000G_omni2.5.hg38.vcf.gz" # Used for GATK VQSR
+  gnomad: "/path/to/af-only-gnomad.hg38.AF001.hg38.vcf.gz" # variants with AF >= 0.01 (`bcftools view -f PASS --include 'AF >= 0.01'`) used for somatic filtering
+  tgp_accessibility: "/path/to/1kgp_masked_grch38.badsites.bed" # 1KGP genome acceessibility mask (contains regions to REMOVE, not keep)
+  funcotator_resource: "/path/to/funcotator_dataSources.v1.7.20200521s.tar.gz" # GATK Functotator annotation databases
+run_params: # parameter values called by map_clones.smk workflow 
+  coverage_threshold: 2 
+  sensitivity_threshold: 0.5
+  dist_threshold: 10
+  vaf_lrt_pthreshold: 0.05
+  pigz:
+    threads: 16
+    mem_mb: 64000
+  mosdepth:
+    threads: 8
+    mem_mb: 16000
+  fastp:
+    threads: 16
+    mem_mb: 64000
+  gatk:
+    threads: 16
+    mem_mb: 64000
+  samtools:
+    threads: 16
+    mem_mb: 64000
+  bwa:
+    threads: 16
+    mem_mb: 64000
+  bcftools:
+    threads: 8
+    mem_mb: 32000
+  somatic_filter:
+    threads: 16
+  telseq:
+    threads: 8
+    mem_mb: 32000

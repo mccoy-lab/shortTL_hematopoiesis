@@ -1,0 +1,15 @@
+name: mapping
+channels:
+  - bioconda
+  - conda-forge
+  - r
+dependencies:
+  - pigz
+  - pandas
+  - numpy
+  - fastp
+  - bwa=0.7.17
+  - samtools=1.11
+  - gatk4=4.5.0.0
+  - bcftools=1.17
+  - telseq
