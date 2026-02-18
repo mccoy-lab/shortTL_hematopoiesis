@@ -49,7 +49,7 @@ def macgregor_single_likelihood(
 
 def macgregor_unobserved_likelihood(t=30, s=1e-2, mu=1e-9, f0=1e-2, **kwargs):
     """Likelihood for an unobserved mutation."""
-    assert f0 > 0
+    assert (f0 > 0) and (f0 < 0.5)
     integrand = quad(lambda f: freq_age_density(s=s, mu=mu, **kwargs)(f, t), 0.0, f0)
     return integrand
 
