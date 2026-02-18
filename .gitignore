@@ -1,4 +1,3 @@
-analyses/vaf_modeling/plots/*
 analyses/3_*/plots/
 analyses/4_stochastic_character_mapping/.Rproj.user
 analyses/4_stochastic_character_mapping/.RData

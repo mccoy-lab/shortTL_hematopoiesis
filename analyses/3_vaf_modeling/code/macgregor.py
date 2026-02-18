@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import binom
+from scipy.stats import binom, chi2
 from scipy.special import gamma
 from scipy.optimize import minimize, minimize_scalar
 from scipy.integrate import quad
@@ -94,3 +94,27 @@ def mle_inference(rs, ds, ts, **kwargs):
         options={"disp": True},
     )
     return opt_res
+
+
+def confint_s(rs, ds, ts, s_hat, mu=1e-9, q=0.95, df=1, **kwargs):
+    """Estimate the confidence interval for s using a profile likelihood."""
+    wilks = lambda x: 2 * (
+        macgregor_total_loglik(rs, ds, ts, mu=mu, s=s_hat, **kwargs)
+        - macgregor_total_loglik(rs, ds, ts, mu=mu, s=x, **kwargs)
+    )
+    qval = chi2.ppf(q, df=df)
+    lower = bisect(lambda x: wilks(x) - qval, 1e-9, s_hat)
+    upper = bisect(lambda x: wilks(x) - qval, s_hat, 0.5)
+    return (lower, upper)
+
+
+def confint_mu(rs, ds, ts, mu_hat, s=1e-2, q=0.95, df=1, **kwargs):
+    """Estimate the confidence interval for mu using a profile likelihood."""
+    wilks = lambda x: 2 * (
+        macgregor_total_loglik(rs, ds, ts, mu=mu_hat, s=s, **kwargs)
+        - macgregor_total_loglik(rs, ds, ts, mu=mu_hat, s=s, **kwargs)
+    )
+    qval = chi2.ppf(q, df=df)
+    lower = bisect(lambda x: wilks(x) - qval, 1e-20, mu_hat)
+    upper = bisect(lambda x: wilks(x) - qval, mu_hat, 1e-6)
+    return (lower, upper)
