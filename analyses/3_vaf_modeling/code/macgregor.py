@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import binom, chi2
 from scipy.special import gamma
-from scipy.optimize import minimize, minimize_scalar
+from scipy.optimize import minimize, minimize_scalar, brentq
 from scipy.integrate import quad
 
 
@@ -23,20 +23,23 @@ def freq_age_density(s, mu=1e-9, N=1e5, tau=1):
     return rho
 
 
-def downsample(n, x, max_n=100, seed=42):
+def downsample(n, x, max_n=100):
     """Downsample super high clinical read depths"""
     p = x / n
     x = binom.rvs(n=max_n, p=p)
     return max_n, x
 
 
-def macgregor_single_likelihood(r, d, t=30, s=0.01, mu=1e-9, **kwargs):
+def macgregor_single_likelihood(
+    r, d, t=30, s=0.01, mu=1e-9, read_threshold=100, **kwargs
+):
     """Likelihood for a sample with actual read information."""
     assert r >= 0
     assert d >= r
     assert t >= 0
+    assert read_threshold > 0
     x = freq_age_density(s=s, mu=mu, **kwargs)
-    if d > 200:
+    if d > read_threshold:
         d2, r2 = downsample(n=d, x=r)
         integrand = quad(lambda f: binom.pmf(r2, n=d2, p=f) * x(f, t), 0, 0.5)
     else:
@@ -51,12 +54,15 @@ def macgregor_unobserved_likelihood(t=30, s=1e-2, mu=1e-9, f0=1e-2, **kwargs):
     return integrand
 
 
-def macgregor_total_loglik(rs, ds, ts, f0=1e-2, s=1e-4, mu=1e-9, **kwargs):
+def macgregor_total_loglik(rs, ds, ts, f0=1e-2, s=1e-4, mu=1e-9, seed=42, **kwargs):
     """The total log-likelihood for observed and unobserved mutations."""
     assert rs.ndim == 1
     assert ds.ndim == 1
     assert rs.size == ds.size
     assert ts.size == rs.size
+    assert seed > 0
+    # Seed is only really relevant to downsampling ...
+    np.random.seed(seed)
     loglik = 0.0
     for r, d, t in zip(rs, ds, ts):
         if (r > 0) & (d > 0):
@@ -103,8 +109,9 @@ def confint_s(rs, ds, ts, s_hat, mu=1e-9, q=0.95, df=1, **kwargs):
         - macgregor_total_loglik(rs, ds, ts, mu=mu, s=x, **kwargs)
     )
     qval = chi2.ppf(q, df=df)
-    lower = bisect(lambda x: wilks(x) - qval, 1e-9, s_hat)
-    upper = bisect(lambda x: wilks(x) - qval, s_hat, 0.5)
+    # NOTE: these are typically use to avoid roundoff errors in integration
+    lower = brentq(lambda x: wilks(x) - qval, 1e-9, s_hat)
+    upper = brentq(lambda x: wilks(x) - qval, s_hat, 0.4 - 1e-9)
     return (lower, upper)
 
 
@@ -112,9 +119,15 @@ def confint_mu(rs, ds, ts, mu_hat, s=1e-2, q=0.95, df=1, **kwargs):
     """Estimate the confidence interval for mu using a profile likelihood."""
     wilks = lambda x: 2 * (
         macgregor_total_loglik(rs, ds, ts, mu=mu_hat, s=s, **kwargs)
-        - macgregor_total_loglik(rs, ds, ts, mu=mu_hat, s=s, **kwargs)
+        - macgregor_total_loglik(rs, ds, ts, mu=x, s=s, **kwargs)
     )
     qval = chi2.ppf(q, df=df)
-    lower = bisect(lambda x: wilks(x) - qval, 1e-20, mu_hat)
-    upper = bisect(lambda x: wilks(x) - qval, mu_hat, 1e-6)
+    # NOTE: these are typically use to avoid roundoff errors in integration
+    lower = brentq(lambda x: wilks(x) - qval, 1e-12, mu_hat)
+    upper = brentq(lambda x: wilks(x) - qval, mu_hat, 1e-6)
     return (lower, upper)
+
+
+def clonesize_density(s=1e-2, mu=1e-9, N=1e5, tau=1):
+    """Obtain the density of clone sizes as a function of n."""
+    pass
