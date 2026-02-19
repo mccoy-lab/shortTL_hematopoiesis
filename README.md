@@ -5,18 +5,18 @@ This repository is an archive for the bioinformatic code required to reproduce t
 
 ### [analyses](analyses/)
 
-#### [1_clone_wgs_processing](analyses/1_clone_wgs_processing/)
+#### [1_clone_wgs_processing](analyses/1_clone_wgs_processing)
 
 Snakemake pipeline used for processing of clone-based WGS data to generate somatic phylogenies. An additional [`readme`](analyses/1_clone_wgs_processing/README.md) is available for a full description of the pipeline. 
 
-#### [2_modeling_convergence](analysis/2_modeling_convergence/)
+#### [2_modeling_convergence](analyses/2_modeling_convergence)
 
 Rmarkdown notebook detailing the methods used to estimate the probability of recurrent mutation (≥ 2 mutation events) in a population of hematopoietic progenitors given empirical estimates for $\mu$ in the HSC compartment.
 
-#### [3_drift_only_vaf](analysis/3_drift_only_vaf/)
+#### [3_drift_only_vaf](analyses/3_drift_only_vaf)
 
 Jupyter notebook for estimating the likelihood of *TERTp* -124C>T VAFs given a neutral Wright-Fisher model.
 
-#### [4_stochastic_character_mapping](analysis/4_stochastic_character_mapping)
+#### [4_stochastic_character_mapping](analyses/4_stochastic_character_mapping)
 
 Rmarkdown notebook detailing the methods for performing stochastic character mapping to infer the evolutionary origin of a somatic mutation given a phylogenetic tree.

@@ -3,7 +3,7 @@ analyses/4_stochastic_character_mapping/.Rproj.user
 analyses/4_stochastic_character_mapping/.RData
 analyses/4_stochastic_character_mapping/.Rhistory
 analyses/4_stochastic_character_mapping/*.Rproj
-./dev/
-./data/
+dev/
+data/
 .DS_Store
 .Rproj.user
