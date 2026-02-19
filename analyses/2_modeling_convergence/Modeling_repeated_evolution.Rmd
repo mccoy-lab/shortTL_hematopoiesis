@@ -1,7 +1,7 @@
 ---
-title: "Modeling parallel evolution in HSC population"
+title: "Modeling repeated evolution in HSC population"
 author: "Michael Tassia"
-date: "2025-09-22"
+date: "Feb. 19, 2026"
 output:
   pdf_document: default
   html_document: default
