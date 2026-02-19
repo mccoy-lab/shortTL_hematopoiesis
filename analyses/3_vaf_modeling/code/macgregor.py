@@ -44,14 +44,15 @@ def macgregor_single_likelihood(
         integrand = quad(lambda f: binom.pmf(r2, n=d2, p=f) * x(f, t), 0, 0.5)
     else:
         integrand = quad(lambda f: binom.pmf(r, n=d, p=f) * x(f, t), 0, 0.5)
-    return integrand
+    return np.log(integrand)
 
 
 def macgregor_unobserved_likelihood(t=30, s=1e-2, mu=1e-9, f0=1e-2, **kwargs):
-    """Likelihood for an unobserved mutation."""
+    """Likelihood for an unobserved somatic variant."""
     assert (f0 > 0) and (f0 < 0.5)
-    integrand = quad(lambda f: freq_age_density(s=s, mu=mu, **kwargs)(f, t), 0.0, f0)
-    return integrand
+    x = freq_age_density(s=s, mu=mu, **kwargs)
+    integrand = quad(lambda f: x(f, t), 0.0, f0)
+    return np.log(integrand)
 
 
 def macgregor_total_loglik(rs, ds, ts, f0=1e-2, s=1e-4, mu=1e-9, seed=42, **kwargs):
@@ -64,11 +65,22 @@ def macgregor_total_loglik(rs, ds, ts, f0=1e-2, s=1e-4, mu=1e-9, seed=42, **kwar
     # Seed is only really relevant to downsampling ...
     np.random.seed(seed)
     loglik = 0.0
-    for r, d, t in zip(rs, ds, ts):
-        if (r > 0) & (d > 0):
-            loglik += np.log(macgregor_single_likelihood(r, d, t=t, s=s, mu=mu)[0])
-        else:
-            loglik += np.log(macgregor_unobserved_likelihood(t=t, s=s, mu=mu, f0=f0)[0])
+    idx = np.where((rs > 0) & (ds > 0))[0]
+    idx_non_obs = np.where((rs == 0) & (ds == 0))[0]
+    for r, d, t in zip(rs[idx], ds[idx], ts[idx]):
+        loglik += macgregor_single_likelihood(r, d, t=t, s=s, mu=mu)[0]
+    if np.sum(idx_non_obs) > 100:
+        # Do some creative caching
+        ts_non, cnts_non = np.unique(np.round(ts[idx_non_obs]), return_counts=True)
+        for t, c in zip(ts_non, cnts_non):
+            loglik += c * macgregor_unobserved_likelihood(t=t, s=s, mu=mu, f0=f0)[0]
+    else:
+        loglik += np.sum(
+            [
+                macgregor_unobserved_likelihood(t=t, s=s, mu=mu, f0=f0)[0]
+                for t in ts[idx_non_obs]
+            ]
+        )
     return loglik
 
 
