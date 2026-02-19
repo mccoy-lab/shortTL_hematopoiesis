@@ -1,5 +1,5 @@
 ---
-title: "Modeling convergence in HSC population"
+title: "Modeling parallel evolution in HSC population"
 author: "Michael Tassia"
 date: "2025-09-22"
 output:
