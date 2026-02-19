@@ -1,4 +1,4 @@
-analyses/drift_only_vaf/plots/*
+analyses/3_vaf_modeling/plots/
 analyses/4_stochastic_character_mapping/.Rproj.user
 analyses/4_stochastic_character_mapping/.RData
 analyses/4_stochastic_character_mapping/.Rhistory
@@ -7,3 +7,4 @@ dev/
 data/
 .DS_Store
 .Rproj.user
+analyses/*/sandbox/
