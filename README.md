@@ -13,7 +13,7 @@ Snakemake pipeline used for processing of clone-based WGS data to generate somat
 
 Rmarkdown notebook detailing the methods used to estimate the probability of recurrent mutation (≥ 2 mutation events) in a population of hematopoietic progenitors given empirical estimates for $\mu$ in the HSC compartment.
 
-#### [3_drift_only_vaf](analyses/3_drift_only_vaf)
+#### [3_drift_only_vaf](analyses/3_vaf_modeling)
 
 Jupyter notebook for estimating the likelihood of *TERTp* -124C>T VAFs given a neutral Wright-Fisher model.
 
