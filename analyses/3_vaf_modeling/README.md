@@ -13,11 +13,11 @@ The directories are organized as:
 
 ### `code`
 
-Contains code used for likelihoods under the neutral Wright-Fisher model and under the model from Macgregor et al 2025. These are two models for modeling variant-allele-fraction in bulk sequencing data 
+Contains code used for likelihoods under the neutral Wright-Fisher model and under the model from Macgregor et al 2025. These are two models for modeling variant-allele-fraction in bulk sequencing data. 
 
 ### `data` 
 
-Contains all relevant summary data for recreating plots pertaining to TERTp VAF 
+Contains all relevant summary data for recreating plots pertaining to estimates of selection on  TERTp hotspot mutations based on their estimated VAF.  
 
 ### `notebooks`
 
