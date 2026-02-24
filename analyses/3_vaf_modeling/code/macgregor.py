@@ -70,7 +70,7 @@ def macgregor_total_loglik(rs, ds, ts, f0=1e-2, s=1e-4, mu=1e-9, seed=42, **kwar
     for r, d, t in zip(rs[idx], ds[idx], ts[idx]):
         loglik += macgregor_single_likelihood(r, d, t=t, s=s, mu=mu)[0]
     if np.sum(idx_non_obs) > 100:
-        # Do some creative caching
+        # Do some creative caching here ...
         ts_non, cnts_non = np.unique(np.round(ts[idx_non_obs]), return_counts=True)
         for t, c in zip(ts_non, cnts_non):
             loglik += c * macgregor_unobserved_likelihood(t=t, s=s, mu=mu, f0=f0)[0]
@@ -114,16 +114,29 @@ def mle_inference(rs, ds, ts, **kwargs):
     return opt_res
 
 
-def confint_s(rs, ds, ts, s_hat, mu=1e-9, q=0.95, df=1, **kwargs):
+def confint_s(rs, ds, ts, s_hat, mu=1e-9, q=0.95, df=1, alpha=1.5, **kwargs):
     """Estimate the confidence interval for s using a profile likelihood."""
+    assert alpha > 0
     wilks = lambda x: 2 * (
         macgregor_total_loglik(rs, ds, ts, mu=mu, s=s_hat, **kwargs)
         - macgregor_total_loglik(rs, ds, ts, mu=mu, s=x, **kwargs)
     )
     qval = chi2.ppf(q, df=df)
     # NOTE: these are typically use to avoid roundoff errors in integration
-    lower = brentq(lambda x: wilks(x) - qval, 1e-9, s_hat)
-    upper = brentq(lambda x: wilks(x) - qval, s_hat, 0.4 - 1e-9)
+    try:
+        lower = brentq(
+            lambda x: wilks(x) - qval, np.maximum(1e-9, s_hat - s_hat / alpha), s_hat
+        )
+    except ValueError:
+        lower = 1e-9
+    try:
+        upper = brentq(
+            lambda x: wilks(x) - qval,
+            s_hat,
+            np.minimum(0.4 - 1e-9, s_hat + s_hat / alpha),
+        )
+    except ValueError:
+        upper = np.nan
     return (lower, upper)
 
 
@@ -135,8 +148,18 @@ def confint_mu(rs, ds, ts, mu_hat, s=1e-2, q=0.95, df=1, **kwargs):
     )
     qval = chi2.ppf(q, df=df)
     # NOTE: these are typically use to avoid roundoff errors in integration
-    lower = brentq(lambda x: wilks(x) - qval, 1e-12, mu_hat)
-    upper = brentq(lambda x: wilks(x) - qval, mu_hat, 1e-6)
+    try:
+        lower = brentq(
+            lambda x: wilks(x) - qval, np.maximum(1e-12, mu_hat * 1e-2), mu_hat
+        )
+    except ValueError:
+        lower = brentq(lambda x: wilks(x) - qval, 1e-12, mu_hat)
+    try:
+        upper = brentq(
+            lambda x: wilks(x) - qval, mu_hat, np.minimum(1e-6, mu_hat * (1e2))
+        )
+    except ValueError:
+        upper = 1e-6
     return (lower, upper)
 
 
