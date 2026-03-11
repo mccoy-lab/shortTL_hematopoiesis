@@ -9,7 +9,7 @@
 #SBATCH --mail-user=syan11@jhu.edu
 #SBATCH --array=1-1000%50
 
-# Runs a simulation of HSPC population dynamics over the lifetime of one individual.
+# In each array job, run a simulation of HSPC population dynamics over the lifetime of one individual.
 
 #========#
 # Inputs #
