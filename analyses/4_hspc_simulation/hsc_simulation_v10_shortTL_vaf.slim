@@ -1,0 +1,345 @@
+// initialize
+initialize() {
+	initializeSLiMModelType("nonWF");
+	initializeSLiMOptions(keepPedigrees = T);
+	
+	// remove genomes and recombination
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	initializeMutationRate(0);
+	initializeGenomicElementType("g1", m1, 1.0);
+	initializeGenomicElement(g1, 0, 1);
+	initializeRecombinationRate(0);
+	
+	// define constants for running simulation
+	// initial pop size
+	defineConstant("initial_size", 100000);
+	// number of days to simulate
+	defineConstant("final_age_days", 90 * 365);
+	
+	// number of days per generation
+	defineConstant("gen_time_days", 280);
+	
+	// std dev of initial telomere length
+	defineConstant("telo_sd", 1250);
+	// std dev shortening length per generation
+	defineConstant("shorten_sd", 70/6);
+	
+	// telomere death threshold
+	defineConstant("death_thresh", 4000);
+	
+	// probability of division being asymmetric
+	defineConstant("pAsym", 0.9);
+	// subprobability of division being symmetric
+	defineConstant("pSym", 0.525);
+	
+	// use these values if in slimgui; otherwise take from command line
+	if (exists("slimgui"))
+	{
+		// mean shortening length per generation
+		defineConstant("shorten_mean", 100);
+		// mutation rate at TERT promoter
+		defineConstant("mut_rate", 1e-7);
+		// mean initial telomere length
+		defineConstant("telo_mean", 8000);
+	}
+}
+
+1 {
+	// add starting population of cells
+	sim.addSubpop("p1", initial_size);
+	
+	p1.individuals.tagF = 0; // tracks TL
+	p1.individuals.tag = 0; // tracks daily division decision
+	p1.individuals.x = 0; // tracks mutation presence/absence
+	p1.individuals.y = 0; // tracks # of divisions per cell
+	p1.individuals.z = 0; // tracks TERTp lineage
+	
+	// set initial telomere length
+	set_telomere_lengths(p1, telo_mean);
+	
+	// set how many generations to simulate
+	sim.rescheduleScriptBlock(s1, start = final_age_days,
+		end = final_age_days);
+	
+	// print header of output
+	catn(paste("generation\tvaf\tpopsize",
+					"\twt_tl\ttertp_tl\twt_numdiv\ttertp_numdiv",
+					"\tn_tert_lineages"));
+}
+
+s1 36500 {
+	sim.simulationFinished();
+}
+
+// decide which cells are reproducing this day
+first() {
+	// skip generation 1 because pops don't exist yet
+	if (sim.generation > 1) {
+		
+		// sample cells with division probability 1/generation time
+		pop_size = p1.individualCount;
+		
+		if (p1.individualCount > 0) {
+			// determine every cell's division type for this day by setting `tag` field
+			p1_tags = sapply(rep(1/gen_time_days, p1.individualCount),
+				"set_division_type(applyValue, pAsym, pSym);");
+			p1.individuals.tag = p1_tags;
+			// Increment division counter for all cells
+			dividing = p1_tags > 0;
+			p1.individuals.y = p1.individuals.y + asInteger(dividing);
+			
+			// mutate by modifying individual.x field of dividing cells
+			mutate_tertp(p1, mut_rate);
+		}
+	}
+}
+
+// generate daughter cells
+reproduction() {
+	// only pick cells that were chosen to divide symmetrically today
+	if (individual.tag == 2) {
+		// clonal reproduction
+		individual.subpopulation.addCloned(individual);
+		// shorten telomeres for this cell if it does not have TERTp mutation
+		if (individual.x == 0) {
+			individual.tagF = shorten_telomeres(individual.tagF);
+		}
+	}
+}
+
+// use modifyChild to set tag fields for daughter cells
+modifyChild() {
+	// cells inherit telomere length and TERTp mutation status from parent
+	child.tagF = parent1.tagF;
+	child.x = parent1.x;
+	child.z = parent1.z;
+	// initialize tag field (cell division type) and cell division counter for child
+	child.tag = 0;
+	child.y = 0;
+	
+	// return True so that child is created
+	return T;
+}
+
+// TODO: Distribution of death probability by TL
+// cell death and mutation
+early() {
+	// can't do in generation 1 because pops don't exist yet
+	if (sim.generation > 1) {
+		// asymmetric division
+		asym_divide(p1);
+		
+		// kill cells if their telomeres are too short
+		if (p1.individualCount > 0)
+			kill_cells(p1);
+		
+		// select cells every day to differentiate asymmetrically (drop out of HSC pop)
+		// this happens after telomere death because it involves setting fitness
+		asym_diff(p1);
+	}
+}
+
+late() {
+	// re-set tag field
+	p1.individuals.tag = 0;
+	
+	//	return info every year (365 days)
+	if ((sim.generation % 365) == 0) {
+		wt_cells = p1.individuals[p1.individuals.x == 0];
+		tert_cells = p1.individuals[p1.individuals.x == 1];
+		
+		vaf = (sum(p1.individuals.x == 1)) / p1.individualCount;
+		wt_tl = sum(wt_cells.tagF) / length(wt_cells);
+		tert_tl = sum(tert_cells.tagF) / length(tert_cells);
+		wt_numdiv = sum(wt_cells.y);
+		tert_numdiv = sum(tert_cells.y);
+		// # of unique TERTp lineages in simulation
+		lineages = unique(p1.individuals.z);
+		n_tert_lineages = length(lineages[lineages != 0.0]);
+		
+		catn(paste(sim.generation, "\t", vaf, "\t", p1.individualCount,
+						"\t", wt_tl, "\t", tert_tl,
+						"\t", wt_numdiv, "\t", tert_numdiv,
+						"\t", n_tert_lineages));
+	}
+}
+
+
+
+
+//==================================================//
+//================ HELPER FUNCTIONS ================//
+//==================================================//
+
+/*
+	Sets starting telomere length of all individuals in the `tagF`
+	field, drawn from a normal distribution.
+	@param	p		subpop ID to work on
+	@param	mean_tl	mean TL for this simulation
+*/
+function (void)set_telomere_lengths(Nio<Subpopulation> p, float mean_tl)
+{
+	// draw telomere lengths from a normal distribution
+	lengths = rnorm(p.individualCount, mean_tl, telo_sd);
+	// set each individual's tagF field to telomere length
+	p.individuals.tagF = lengths;
+}
+
+/*
+	Chooses a cell division type based on baseline probabilities.
+	@param	division_prob			probability of cell division for this pop
+	@param	asym_division_prob	probability that division is asymmetric
+	@param	sym_division_prob		sub-probability that division is symmetric
+	@return	integer					cell's tag field for this day:
+											0 no division
+											1 asymmetric division
+											2 symmetric division
+											3 differentiation
+*/
+function (integer)set_division_type(float division_prob,
+												float asym_division_prob,
+												float sym_division_prob) {
+	// whether or not to divide
+	if (rbinom(1, 1, division_prob) == 0) {
+		return 0; // no division
+	}
+	else {
+		// asymmetric division
+		if (rbinom(1, 1, asym_division_prob) == 1) {
+			return 1;
+		}
+		else {
+			// symmetric division
+			if (rbinom(1, 1, sym_division_prob) == 1) {
+				return 2;
+			}
+			// differentiation
+			else {
+				return 3;
+			}
+		}
+	}
+}
+
+/*
+	Annotates cell with ID of individual where TERTp mutation first occurred.
+	@param	idx	index of individual in subpopulation
+*/
+function(integer)track_lineage(integer idx) {
+	// Get individual with index idx
+	ind = p1.individuals[idx];
+
+	// If TERTp lineage is empty, set to pedigree ID of current cell
+	if (ind.z == 0) {
+		ind.z = ind.pedigreeID;
+	}
+	// otherwise, leave TERTp lineage as is
+
+	// return something so we can use sapply
+	return ind.pedigreeID;
+}
+
+/*
+	Apply TERTp mutation with some probability to cells in a subpopulation.
+	@param	p				subpop ID to work on
+	@param	mut_rate		per-cell and per-day probability of TERTp mutation
+*/
+function(void)mutate_tertp(Nio<Subpopulation> p,
+									float tertp_mut_rate)
+{
+	// Get x values (TERTp mutation presence/absence) for all cells in the population
+	all_x = p.individuals.x;
+	// Get indices of *wild-type* cells (x = 0) that are dividing today (tag != 0)
+	wt_idxs = which(all_x == 0 & p.individuals.tag != 0);
+	// Mutate wt cells with some probability
+	idxs_to_mutate = rbinom(length(wt_idxs), 1, tertp_mut_rate);
+	// Replace x values for wild-type cells with mutation status
+	all_x[wt_idxs] = idxs_to_mutate;
+	
+	// Rewrite x field
+	p.individuals.x = all_x;
+	// Subset wt_idxs to only those where idxs_to_mutate is 1
+	wt_idxs_mutated = wt_idxs[idxs_to_mutate == 1];
+	// Apply track_lineage function across all individuals with index wt_idx
+	output = sapply(wt_idxs_mutated, "track_lineage(applyValue);");
+}
+
+/*
+	Identifies cells chosen to reproduce asymmetrically (i.e., shorten
+	their telomeres) every generation and reduces their telomere length.
+	@param	p	subpop ID to work on
+*/
+function (void)asym_divide(Nio<Subpopulation> p)
+{
+	// choose cells marked for asymmetric division
+	// only choose if there's no TERTp mutation
+	inds = p.individuals[p.individuals.tag == 1 & p.individuals.x == 0];
+	
+	// shorten telomere lengths
+	if (length(inds) > 0) {
+		inds.tagF = sapply(inds.tagF,
+			"shorten_telomeres(applyValue);");
+	}
+}
+
+/*
+	Given a starting telomere length, draws a shortened length from a
+	normal distribution.
+	@param	start_len	starting telomere length
+	@return	float			shortened telomere length
+*/
+function (float)shorten_telomeres(float start_len)
+{
+	// draw telomere decrease length from a normal distribution
+	decrease_len = rnorm(1, shorten_mean, shorten_sd);
+	return(start_len - decrease_len);
+}
+
+/*
+	Identifies cells chosen to differentiate (i.e., drop out of HSC
+	population) and sets their fitness to 0.
+	@param	p	subpop ID to work on
+*/
+function (void)asym_diff(Nio<Subpopulation> p)
+{
+	// choose cells marked for differentiation
+	inds = p.individuals[p.individuals.tag == 3];
+	
+	// set fitness to 0 (death at viability check stage)
+	inds.fitnessScaling = 0;
+}
+
+/*
+	Sets fitness of cells in a population based on telomere length.
+	@param	p	subpop ID to work on
+*/
+function (void)kill_cells(Nio<Subpopulation> p)
+{
+	// get telomere lengths for all individuals
+	telos = p.individuals.tagF;
+	
+	// get corresponding fitness for telomere length
+	new_fitnesses = sapply(telos, "get_fitness(applyValue);");
+	p.individuals.fitnessScaling = new_fitnesses;
+}
+
+/*
+	Calculates fitness for cell based on telomere length.
+	@param	telo_len	cell's current telomere length
+	@return	float		fitness modifier for cell
+*/
+function (float)get_fitness(float telo_len)
+{
+	// >4kb - you're safe
+	if (telo_len > death_thresh) {
+		return 1.0;
+	}
+	// <=2kb - you're dead
+	if (telo_len <= 2000) {
+		return 0.0;
+	}
+	// in between - calculate fitness, decreases linearly from 4kb-2kb
+	else {
+		return 0.5 * (telo_len - 2000) * 1/1000;
+	}
+}

@@ -16,3 +16,7 @@ Rmarkdown notebook detailing the methods used to estimate the probability of rec
 #### [3_stochastic_character_mapping](analyses/3_stochastic_character_mapping)
 
 Rmarkdown notebook detailing the methods for performing stochastic character mapping to infer the evolutionary origin of a somatic mutation given a phylogenetic tree.
+
+#### [4_hspc_simulation](analyses/4_hspc_simulation)
+
+Rmarkdown notebook describing simulations of TERTp somatic evolution in HSPC populations, and code for running simulations and plotting output.
