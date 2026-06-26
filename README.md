@@ -20,3 +20,7 @@ Rmarkdown notebook detailing the methods for performing stochastic character map
 #### [4_hspc_simulation](analyses/4_hspc_simulation)
 
 Rmarkdown notebook describing simulations of TERTp somatic evolution in HSPC populations, and code for running simulations and plotting output.
+
+#### [5_phylogenies](analyses/5_phylogenies)
+
+Directories containing phylogenetic trees scaled by [molecular time](analyses/5_phylogenies/cellphy), [mutation burden](analyses/5_phylogenies/treemut), and [age](analyses/5_phylogenies/ultrametric).
