@@ -1,6 +1,8 @@
 # Short telomere clonal hematopoiesis
 This repository is an archive for the bioinformatic code required to reproduce the evolutionary modeling and clone-based WGS data analyses presented in *Schratz et al. (TBD)*.
 
+[![DOI](https://zenodo.org/badge/1135736159.svg)](https://doi.org/10.5281/zenodo.24139210)
+
 ---
 
 ### [analyses](analyses/)
