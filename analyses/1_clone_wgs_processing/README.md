@@ -36,11 +36,16 @@ snakemake --configfile /path/to/config.yaml --use-conda
 
 This command will call the parent [`Snakefile`](workflow/Snakefile) which subsequently includes the data processing [snakefile](workflow/rules/map_clones.smk). 
 
-### Scripts directory
+### Scripts
 
 The [`workflow/scripts/`](workflow/scripts) directory contains all scripts required for the [`map_clones.smk`](workflow/rules/map_clones.smk) rules. All scripts are included in `input` directives within [`map_clones.smk`](workflow/rules/map_clones.smk), so the pipeline will not initialize without first confirming they're present.
 
 Additionally, the [`workflow/scripts/companion_scripts/`](workflow/scripts/companion_scripts/) subdirectory contains additional functions used for phylogenetic inference preparation/execution.
+
+
+### `doc` directory
+
+The [`doc/`](doc/) directory contains a notebook detailing the results from residualizing telomere length and clock-like mutation burden estimates by binned depth profiles across each sample. 
 
 ### Rulegraph
 
